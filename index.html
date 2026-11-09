@@ -1087,13 +1087,27 @@ function vMore(){
     +`<div class="card" style="margin-top:16px"><div class="sec-t">${ic('alert')} Veri gizliliği</div><div class="muted">Tüm kayıtlar yalnızca bu cihazın tarayıcısında saklanır; hiçbir sunucuya gönderilmez. Sağlık bilgileri KVKK kapsamında özel nitelikli veridir; danışandan onam alın, telefonunuzu kilitli tutun ve düzenli yedek alın.</div></div>`;
   return{title:'Daha fazla',html};
 }
+// uygulama adı: sekme başlığı + ana ekrana eklerken kullanılan ad (yalnızca internet adresinden açılınca)
+let manifestUrl=null;
+function applyBrand(){
+  const name=db.settings.biz||DEF.biz;
+  document.title=name;
+  if(!/^https?:/.test(location.protocol))return;
+  const base=location.href.split(/[?#]/)[0].replace(/[^/]*$/,'');
+  const m={name,short_name:name.length>12?name.slice(0,12):name,lang:'tr',start_url:base,scope:base,display:'standalone',
+    background_color:'#fbf6f2',theme_color:(THEMES.find(t=>t[0]===(db.settings.theme||'auto'))||THEMES[0])[3],
+    icons:[{src:base+'icon-192.png',sizes:'192x192',type:'image/png',purpose:'any maskable'},{src:base+'icon-512.png',sizes:'512x512',type:'image/png',purpose:'any maskable'}]};
+  if(manifestUrl)URL.revokeObjectURL(manifestUrl);
+  manifestUrl=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));
+  document.querySelector('link[rel=manifest]').href=manifestUrl;
+}
 function applyTheme(id){
   const t=THEMES.find(x=>x[0]===id)||THEMES[0];
   document.documentElement.dataset.theme=t[0];
   const dark=t[0]==='gece'||(t[0]==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.querySelector('meta[name=theme-color]').content=dark?'#1b1418':t[3];
 }
-function setTheme(id){db.settings.theme=id;save();applyTheme(id);render();themeSheet()}
+function setTheme(id){db.settings.theme=id;save();applyTheme(id);applyBrand();render();themeSheet()}
 function themeSheet(){
   const cur=db.settings.theme||'auto';
   sheet('Tema seçin',`<div class="muted" style="margin-bottom:12px">Dokunduğunuz tema hemen uygulanır. "Otomatik", telefon gece modundayken koyu temaya geçer.</div>
@@ -1159,7 +1173,8 @@ async function delStock(id){if(!await ask('Stok kalemi silinecek.'))return;db.st
 function vSettings(){
   const S=db.settings;
   const html=`<div class="card"><div class="sec-t">${ic('user')} İşletme</div>
-      <label class="f">İşletme adı</label><input id="st_biz" value="${esc(S.biz)}">
+      <label class="f">Uygulama / işletme adı</label><input id="st_biz" value="${esc(S.biz)}">
+      <div class="muted" style="margin-top:4px">Başlıkta, onam formunda, mesajlarda ve ana ekrana eklerken görünen ad.</div>
       <label class="f">Adınız (karşılama mesajında görünür)</label><input id="st_name" value="${esc(S.name)}" placeholder="Örn. Zeynep Hanım"></div>
     <div class="card"><div class="sec-t">${ic('card')} Varsayılan ücretler</div><div class="muted" style="margin:-4px 0 4px">Seansta uygulama seçilince ücret otomatik dolar.</div>
       <div class="two">${TYPES.map(t=>`<div><label class="f">${t} (₺)</label><input type="number" inputmode="decimal" data-price="${t}" value="${esc(S.prices[t])}"></div>`).join('')}</div></div>
@@ -1193,7 +1208,7 @@ function saveSettings(){
   S.complaints=list;S.biz=$('#st_biz').value.trim()||DEF.biz;S.name=$('#st_name').value.trim();
   document.querySelectorAll('[data-price]').forEach(i=>{S.prices[i.dataset.price]=i.value===''?'':Number(i.value)});
   S.msgRemind=$('#st_rem').value;S.msgCare=$('#st_care').value;S.msgBday=$('#st_bd').value;S.msgRecall=$('#st_rc').value;S.recallDays=Number($('#st_rd').value)||60;S.consentText=$('#st_cons').value;
-  save();toast('Ayarlar kaydedildi');back();
+  save();applyBrand();toast('Ayarlar kaydedildi');back();
 }
 
 // ================= Yedekleme =================
@@ -1243,6 +1258,7 @@ function restore(inp){
 
 // ================= başlat =================
 applyTheme(db.settings.theme||'auto');
+applyBrand();
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>applyTheme(db.settings.theme||'auto'))}catch(e){}
 $('#back').innerHTML=ic('left');
 $('#nav').innerHTML=NAV.map(([v,i,l])=>`<button data-v="${v}" onclick="go('${v}')"><span class="nb">${ic(i)}</span>${l}</button>`).join('');
